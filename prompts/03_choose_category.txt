@@ -1,0 +1,6 @@
+These categories came up for a customer complaint:
+{{step2_response}}
+
+Reply with the single best category that fits and give a reason in one sentence.
+
+Use only these names for the category you pick: {{categories}}.

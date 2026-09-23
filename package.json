@@ -1,7 +1,7 @@
 {
   "name": "customer-support",
   "version": "1.0.0",
-  "type": "module",
+  "description": "Five-step prompt chain for bank customer support classification and response generation.",
   "main": "main.js",
   "dependencies": {
     "dotenv": "^16.4.5"

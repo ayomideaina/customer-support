@@ -1,0 +1,4 @@
+A customer said: "{{customer_message}}"
+We tagged it as: {{step3_response}}
+
+What details do we need from them to resolve this? Only list what's actually relevant. Use a numbered list and it should be clear.

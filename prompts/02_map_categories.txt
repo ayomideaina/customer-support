@@ -1,0 +1,15 @@
+This is what a customer said: "{{customer_message}}"
+This is what their issue means: {{step1_response}}
+
+Here are the available categories:
+- Account Opening
+- Billing Issue
+- Account Access
+- Transaction Inquiry
+- Card Services
+- Account Statement
+- Loan Inquiry
+- General Information
+
+Which of these categories fit this issue?
+List every one that applies and give a reason for each.

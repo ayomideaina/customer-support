@@ -1,4 +1,4 @@
-# Customer Support Classifier
+# Bank Customer Support Classifier
 
 A simple Node.js script that uses the OpenRouter API to analyze a customer support message, identify the intent and category, determine the details needed to resolve it, and generate a short reply.
 

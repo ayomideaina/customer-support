@@ -1,94 +1,112 @@
-import { config } from 'dotenv';
-
-config();
+require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 
 const API_KEY = process.env.OPENROUTER_API_KEY;
-const BASE_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-const MODEL_NAME = process.env.MODEL_NAME
+const BASE_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const MODEL_NAME = process.env.MODEL_NAME;
 
-const callApi = async (prompt) => {
+const CATEGORIES = [
+  'Account Opening',
+  'Billing Issue',
+  'Account Access',
+  'Transaction Inquiry',
+  'Card Services',
+  'Account Statement',
+  'Loan Inquiry',
+  'General Information',
+];
+
+const loadPrompt = (fileName) =>
+  fs.readFileSync(path.join(__dirname, 'prompts', fileName), 'utf-8');
+
+const fillTemplate = (template, values) =>
+  Object.entries(values).reduce(
+    (text, [key, value]) => text.replaceAll(`{{${key}}}`, value),
+    template
+  );
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetryable = (error) => {
+  const status = error?.code;
+  const type = error?.metadata?.error_type;
+  return status === 503 || status === 429 || type === 'provider_overloaded';
+};
+
+const callApi = async (prompt, attempt = 1) => {
+  const MAX_ATTEMPTS = 4;
+
   const response = await fetch(BASE_API_URL, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${API_KEY}`,
+      Authorization: `Bearer ${API_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       model: MODEL_NAME,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
+      messages: [{ role: 'user', content: prompt }],
     }),
   });
+
   const result = await response.json();
+
   if (result.error) {
-    console.log(result);
+    if (isRetryable(result.error) && attempt < MAX_ATTEMPTS) {
+      const delayMs = 1000 * 2 ** (attempt - 1); // 1s, 2s, 4s
+      console.warn(
+        `  (provider busy, retrying in ${delayMs / 1000}s — attempt ${attempt}/${MAX_ATTEMPTS})`
+      );
+      await sleep(delayMs);
+      return callApi(prompt, attempt + 1);
+    }
+
+    console.error(result);
     throw new Error(result.error.message);
   }
+
   return result.choices?.[0]?.message?.content?.trim();
-}
+};
 
-const promptChain = async (user_complaint) => {
-  const step1Prompt = `
-  You are a bank support agent. Read this customer message and tell me what they want in 1 sentence.
+const promptChain = async (customerQuery) => {
 
-  Customer message:
-  ${user_complaint}
-  `;
-
+  const step1Prompt = fillTemplate(loadPrompt('01_interpret_intent.txt'), {
+    customer_message: customerQuery,
+  });
   const step1Response = await callApi(step1Prompt);
-  console.log("Customer intent: ", step1Response);
+  console.log('\n[Step 1 - Customer intent]\n', step1Response);
 
-  const categories = ["Account Opening", "Billing Issue", "Account Access", "Transaction Inquiry", "Card Services", "Account Statement", "Loan Inquiry", "General Information"];
-
-  const step2Prompt = `
-This is what a customer said: "${user_complaint}"
-This is what their issue means: ${step1Response}
-
-Which of these categories fit the ${step1Response}: ${categories.join(", ")}?
-List every one that applies and give a reason for each.
-`;
-
+  const step2Prompt = fillTemplate(loadPrompt('02_map_categories.txt'), {
+    customer_message: customerQuery,
+    step1_response: step1Response,
+  });
   const step2Response = await callApi(step2Prompt);
-  console.log("Possible categories: ", step2Response);
+  console.log('\n[Step 2 - Possible categories]\n', step2Response);
 
-  const step3Prompt = `
-These categories came up for a customer complaint:
-${step2Response}
-
-reply with the single best category that fits and give a reason in one sentence.
-
-Use only these names for the category you pick: ${categories.join(", ")}.
-`;
-
+  const step3Prompt = fillTemplate(loadPrompt('03_choose_category.txt'), {
+    step2_response: step2Response,
+    categories: CATEGORIES.join(', '),
+  });
   const step3Response = await callApi(step3Prompt);
-  console.log("Best category: ", step3Response);
-  const step4Prompt = `
-A customer said: "${user_complaint}"
-We tagged it as: ${step3Response}
+  console.log('\n[Step 3 - Best category]\n', step3Response);
 
-What details do we need from them to resolve this? Only list what's actually relevant. Use a numbered list and it should be clear.
-`;
-
+  const step4Prompt = fillTemplate(loadPrompt('04_extract_details.txt'), {
+    customer_message: customerQuery,
+    step3_response: step3Response,
+  });
   const step4Response = await callApi(step4Prompt);
-  console.log("Additional details needed: ", step4Response);
-  const step5Prompt = `
-Write a short, friendly response to a bank customer.
+  console.log('\n[Step 4 - Additional details needed]\n', step4Response);
 
-Customer message: "${user_complaint}"
-Issue type: ${step3Response}
-Information needed: ${step4Response}
-
-Keep the reply under 3 sentences. Be clear and conversational. If more information is needed, ask for it. Avoid being too formal and use less bulgy words`
-
+  const step5Prompt = fillTemplate(loadPrompt('05_generate_response.txt'), {
+    customer_message: customerQuery,
+    step3_response: step3Response,
+    step4_response: step4Response,
+  });
   const step5Response = await callApi(step5Prompt);
-  console.log("Final response: ", step5Response);
+  console.log('\n[Final response]\n', step5Response);
 
   return step5Response;
-}
+};
 
 const args = process.argv.slice(2);
 if (args.length < 1) {

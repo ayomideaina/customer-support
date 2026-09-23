@@ -1,0 +1,7 @@
+Write a short, friendly response to a bank customer.
+
+Customer message: "{{customer_message}}"
+Issue type: {{step3_response}}
+Information needed: {{step4_response}}
+
+Keep the reply under 3 sentences. Be clear and conversational. If more information is needed, ask for it. Avoid being too formal and use less bulky words.

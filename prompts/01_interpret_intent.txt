@@ -1,0 +1,4 @@
+You are a bank support agent. Read this customer message and tell me what they want in 1 sentence.
+
+Customer message:
+{{customer_message}}
